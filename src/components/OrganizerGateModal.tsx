@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eye, Lock, LogOut, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, Eye, Lock, LogOut, ShieldCheck } from 'lucide-react';
 import { FESTIVAL_LOGO_URL } from '../data/initialData';
 import { GoogleSignInButton } from './GoogleSignInButton';
 
@@ -7,6 +7,8 @@ interface OrganizerGateModalProps {
   open: boolean;
   currentUserEmail: string | null;
   isSigningIn: boolean;
+  authError?: string | null;
+  onClearAuthError?: () => void;
   onConfirmOrganizerGoogle: () => void;
   onContinueReadOnly: () => void;
   onSwitchAccount: () => void;
@@ -16,6 +18,8 @@ export const OrganizerGateModal: React.FC<OrganizerGateModalProps> = ({
   open,
   currentUserEmail,
   isSigningIn,
+  authError = null,
+  onClearAuthError,
   onConfirmOrganizerGoogle,
   onContinueReadOnly,
   onSwitchAccount,
@@ -79,6 +83,27 @@ export const OrganizerGateModal: React.FC<OrganizerGateModalProps> = ({
               </p>
             </div>
           </div>
+
+          {authError && (
+            <div
+              role="alert"
+              className="bg-red-50 border border-red-300 rounded-xl p-3.5 text-xs text-red-900 space-y-1.5"
+            >
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-700 shrink-0 mt-0.5" />
+                <span className="leading-relaxed">{authError}</span>
+              </div>
+              {onClearAuthError && (
+                <button
+                  type="button"
+                  onClick={onClearAuthError}
+                  className="font-semibold text-red-800 underline underline-offset-2"
+                >
+                  Fermer
+                </button>
+              )}
+            </div>
+          )}
 
           {currentUserEmail && (
             <div className="bg-orange-50 border border-orange-200 rounded-xl p-3.5 text-xs text-orange-950 space-y-2">

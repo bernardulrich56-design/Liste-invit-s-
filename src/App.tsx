@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { User } from 'firebase/auth';
 import {
   collection,
@@ -37,6 +37,7 @@ import {
 } from './data/initialData';
 import {
   db,
+  formatFirebaseAuthError,
   handleFirestoreError,
   initFirebaseAuth,
   OperationType,
@@ -82,9 +83,39 @@ const PUBLIC_INITIAL_GUESTS: Guest[] = INITIAL_GUESTS.map((g) => ({
 
 function getInitialTabFromUrl(): ActiveTab {
   try {
-    const param = new URLSearchParams(window.location.search).get('tab');
-    if (param === 'guests' || param === 'booking' || param === 'tracking' || param === 'admin') {
-      return param;
+    const url = new URL(window.location.href);
+    const param = (url.searchParams.get('tab') || '').toLowerCase();
+    const path = url.pathname.replace(/\/+$/, '').toLowerCase();
+    const hash = url.hash.replace(/^#\/?/, '').toLowerCase();
+
+    if (
+      param === 'admin' ||
+      param === 'organisateur' ||
+      param === 'organizer' ||
+      path === '/admin' ||
+      path === '/organisateur' ||
+      path === '/organizer' ||
+      hash === 'admin' ||
+      hash === 'organisateur' ||
+      hash === 'organizer'
+    ) {
+      return 'admin';
+    }
+    if (
+      param === 'booking' ||
+      path === '/booking' ||
+      path === '/rendez-vous' ||
+      hash === 'booking'
+    ) {
+      return 'booking';
+    }
+    if (
+      param === 'tracking' ||
+      path === '/tracking' ||
+      path === '/suivi' ||
+      hash === 'tracking'
+    ) {
+      return 'tracking';
     }
   } catch {
     // ignore URL errors
@@ -147,7 +178,9 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [isDelegatedAdmin, setIsDelegatedAdmin] = useState(false);
+  const openAdminAfterSignInRef = useRef(false);
 
   // Domain state
   const [guests, setGuests] = useState<Guest[]>(PUBLIC_INITIAL_GUESTS);
@@ -204,6 +237,8 @@ export default function App() {
     setActiveTabState(tab);
     try {
       const url = new URL(window.location.href);
+      url.pathname = '/';
+      url.hash = '';
       if (tab === 'guests') {
         url.searchParams.delete('tab');
       } else {
@@ -248,10 +283,18 @@ export default function App() {
   // Initialize connection & Firebase auth listener
   useEffect(() => {
     testFirestoreConnection();
-    const unsub = initFirebaseAuth((firebaseUser) => {
-      setUser(firebaseUser);
-      setIsAuthReady(true);
-    });
+    const unsub = initFirebaseAuth(
+      (firebaseUser) => {
+        setUser(firebaseUser);
+        if (firebaseUser) {
+          setAuthError(null);
+        }
+        setIsAuthReady(true);
+      },
+      (message) => {
+        setAuthError(message);
+      }
+    );
     return () => unsub();
   }, []);
 
@@ -282,6 +325,14 @@ export default function App() {
       cancelled = true;
     };
   }, [user]);
+
+  useEffect(() => {
+    if (isAdmin && openAdminAfterSignInRef.current) {
+      openAdminAfterSignInRef.current = false;
+      setAdminSubTab('demandes');
+      setActiveTab('admin');
+    }
+  }, [isAdmin, setActiveTab]);
 
   // Public listener: hosts availability + confirmed public slots
   useEffect(() => {
@@ -629,18 +680,32 @@ export default function App() {
     };
   }, [isAuthReady, isAdmin, isSuperAdmin, user]);
 
-  const handleAdminSignIn = useCallback(async () => {
+  const startAdminSignIn = useCallback(async (openOrganizerAfter = false) => {
+    setAuthError(null);
+    openAdminAfterSignInRef.current = openOrganizerAfter;
     setIsSigningIn(true);
     try {
       await signInWithGoogleAdmin(true);
     } catch (err) {
+      openAdminAfterSignInRef.current = false;
       console.error('Sign in failed:', err);
+      setAuthError(formatFirebaseAuthError(err));
     } finally {
       setIsSigningIn(false);
     }
   }, []);
 
+  const handleAdminSignIn = useCallback(() => {
+    void startAdminSignIn(false);
+  }, [startAdminSignIn]);
+
+  const handleOrganizerSignInAndOpen = useCallback(() => {
+    void startAdminSignIn(true);
+  }, [startAdminSignIn]);
+
   const handleSignOut = useCallback(async () => {
+    setAuthError(null);
+    openAdminAfterSignInRef.current = false;
     await signOutGoogle();
   }, []);
 
@@ -1181,13 +1246,19 @@ export default function App() {
           <ConnectedEcosystemBar
             isAdmin={isAdmin}
             isSigningIn={isSigningIn}
+            authError={authError}
+            onClearAuthError={() => setAuthError(null)}
             currentUserEmail={user?.email || null}
             autoSaveStatus={autoSaveStatus}
             lastSavedAt={lastSavedAt}
             lastSavedLabel={lastSavedLabel}
             isOnline={isOnline}
             guests={guests}
-            onAdminSignIn={handleAdminSignIn}
+            onAdminSignIn={handleOrganizerSignInAndOpen}
+            onOpenOrganizerSpace={() => {
+              setAdminSubTab('demandes');
+              setActiveTab('admin');
+            }}
             onOpenCalendarSection={() => {
               setAdminSubTab('calendars');
               setActiveTab('admin');
@@ -1273,6 +1344,8 @@ export default function App() {
                   isAdmin={isAdmin}
                   isSuperAdmin={isSuperAdmin}
                   isSigningIn={isSigningIn}
+                  authError={authError}
+                  onClearAuthError={() => setAuthError(null)}
                   onAdminSignIn={handleAdminSignIn}
                   onSignOut={handleSignOut}
                   guests={guests}
@@ -1321,16 +1394,18 @@ export default function App() {
                 }}
                 className="hover:text-slate-900 font-medium"
               >
-                Administration
+                Espace Organisateur
               </button>
             </div>
           </div>
         </footer>
 
         <OrganizerGateModal
-          open={isAuthReady && !isAdmin && !readOnlyAcknowledged}
+          open={isAuthReady && !isAdmin && !readOnlyAcknowledged && activeTab !== 'admin'}
           currentUserEmail={user?.email || null}
           isSigningIn={isSigningIn}
+          authError={authError}
+          onClearAuthError={() => setAuthError(null)}
           onConfirmOrganizerGoogle={handleAdminSignIn}
           onContinueReadOnly={handleContinueReadOnly}
           onSwitchAccount={handleSignOut}

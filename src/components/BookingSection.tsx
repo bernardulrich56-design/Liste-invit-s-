@@ -13,7 +13,7 @@ import {
 import {
   APPOINTMENT_REASONS,
   DURATION_OPTIONS,
-  SHARED_APP_URL,
+  getPublicAppUrl,
   WEEKDAYS,
 } from '../data/initialData';
 import {
@@ -271,7 +271,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
   }
 
   const bookingWhatsAppHref = `https://wa.me/?text=${encodeURIComponent(
-    `Bonjour ! Prenez rendez-vous avec Monsieur Jean-Jacques, Vénicia ou Madame Joël (Bilili BD Festival 2026) ici :\n${SHARED_APP_URL}?tab=booking`
+    `Bonjour ! Prenez rendez-vous avec Monsieur Jean-Jacques, Vénicia ou Madame Joël (Bilili BD Festival 2026) ici :\n${getPublicAppUrl()}?tab=booking`
   )}`;
 
   return (

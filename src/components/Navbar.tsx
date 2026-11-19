@@ -23,7 +23,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'tracking', label: 'Suivi & Notifications' },
     {
       id: 'admin',
-      label: pendingAdminCount > 0 ? `Administration (${pendingAdminCount})` : 'Administration',
+      label: pendingAdminCount > 0 ? `Organisateur (${pendingAdminCount})` : 'Organisateur',
     },
   ];
 

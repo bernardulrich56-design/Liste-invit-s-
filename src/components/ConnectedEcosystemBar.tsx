@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  AlertTriangle,
   Calendar,
   Check,
   CloudCheck,
@@ -10,6 +11,7 @@ import {
   MapPin,
   RefreshCw,
   Share2,
+  ShieldCheck,
 } from 'lucide-react';
 import { Guest } from '../types';
 import { exportGuestsToExcel } from '../services/csvUtils';
@@ -20,6 +22,8 @@ export type AutoSaveStatus = 'synced' | 'saving' | 'offline_queued' | 'error';
 interface ConnectedEcosystemBarProps {
   isAdmin: boolean;
   isSigningIn: boolean;
+  authError?: string | null;
+  onClearAuthError?: () => void;
   currentUserEmail: string | null;
   autoSaveStatus: AutoSaveStatus;
   lastSavedAt: Date | null;
@@ -27,6 +31,7 @@ interface ConnectedEcosystemBarProps {
   isOnline: boolean;
   guests: Guest[];
   onAdminSignIn: () => void;
+  onOpenOrganizerSpace: () => void;
   onOpenCalendarSection: () => void;
   onOpenWhatsAppShare: () => void;
 }
@@ -37,6 +42,8 @@ const IFC_MAPS_URL =
 export const ConnectedEcosystemBar: React.FC<ConnectedEcosystemBarProps> = ({
   isAdmin,
   isSigningIn,
+  authError = null,
+  onClearAuthError,
   currentUserEmail,
   autoSaveStatus,
   lastSavedAt,
@@ -44,6 +51,7 @@ export const ConnectedEcosystemBar: React.FC<ConnectedEcosystemBarProps> = ({
   isOnline,
   guests,
   onAdminSignIn,
+  onOpenOrganizerSpace,
   onOpenCalendarSection,
   onOpenWhatsAppShare,
 }) => {
@@ -124,33 +132,74 @@ export const ConnectedEcosystemBar: React.FC<ConnectedEcosystemBarProps> = ({
             </div>
           </div>
 
-          <span className="text-xs font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 whitespace-nowrap shrink-0 self-start md:self-auto">
-            Écriture autorisée · Synchronisation temps réel
-          </span>
+          <div className="flex flex-wrap items-center gap-2 shrink-0 self-start md:self-auto">
+            <span className="text-xs font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 whitespace-nowrap">
+              Écriture autorisée · Temps réel
+            </span>
+            <button
+              type="button"
+              onClick={onOpenOrganizerSpace}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg px-3 py-1.5 whitespace-nowrap transition-colors"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              Espace Organisateur
+            </button>
+          </div>
         </div>
       ) : (
-        <div className="bg-white border border-slate-300/90 rounded-2xl px-4 py-3 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-          <div className="flex items-start sm:items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 flex items-center justify-center shrink-0">
-              <Lock className="w-4 h-4 text-orange-600" />
+        <div className="space-y-2.5">
+          <div className="bg-white border border-slate-300/90 rounded-2xl px-4 py-3 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 flex items-center justify-center shrink-0">
+                <Lock className="w-4 h-4 text-orange-600" />
+              </div>
+              <div>
+                <p className="text-xs sm:text-sm font-bold text-slate-900">
+                  Mode lecture seule · Données protégées par l’organisateur
+                </p>
+                <p className="text-xs text-slate-600">
+                  Vous pouvez consulter la liste, exporter le PDF/CSV et réserver
+                  un rendez-vous (enregistré automatiquement sur Firebase). Seul
+                  l’organisateur peut modifier le registre.
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs sm:text-sm font-bold text-slate-900">
-                Mode lecture seule · Données protégées par l’organisateur
-              </p>
-              <p className="text-xs text-slate-600">
-                Vous pouvez consulter la liste, exporter le PDF/CSV et réserver
-                un rendez-vous (enregistré automatiquement sur Firebase). Seul
-                l’organisateur peut modifier le registre.
-              </p>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <GoogleSignInButton
+                label="Compte Organisateur"
+                onClick={onAdminSignIn}
+                loading={isSigningIn}
+              />
+              <button
+                type="button"
+                onClick={onOpenOrganizerSpace}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-800 whitespace-nowrap transition-colors"
+              >
+                Ouvrir Organisateur
+              </button>
             </div>
           </div>
-          <GoogleSignInButton
-            label="Compte Organisateur"
-            onClick={onAdminSignIn}
-            loading={isSigningIn}
-            className="shrink-0"
-          />
+
+          {authError && (
+            <div
+              role="alert"
+              className="bg-red-50 border border-red-300 text-red-900 rounded-xl px-4 py-3 text-xs sm:text-sm flex items-start justify-between gap-3"
+            >
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-700 shrink-0 mt-0.5" />
+                <span>{authError}</span>
+              </div>
+              {onClearAuthError && (
+                <button
+                  type="button"
+                  onClick={onClearAuthError}
+                  className="text-xs font-semibold text-red-800 underline shrink-0"
+                >
+                  Fermer
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 

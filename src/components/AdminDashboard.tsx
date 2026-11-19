@@ -65,6 +65,8 @@ interface AdminDashboardProps {
   isAdmin: boolean;
   isSuperAdmin: boolean;
   isSigningIn: boolean;
+  authError?: string | null;
+  onClearAuthError?: () => void;
   onAdminSignIn: () => void;
   onSignOut: () => void;
   guests: Guest[];
@@ -110,6 +112,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   isAdmin,
   isSuperAdmin,
   isSigningIn,
+  authError = null,
+  onClearAuthError,
   onAdminSignIn,
   onSignOut,
   guests,
@@ -125,10 +129,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onDeleteAdminUser,
 }) => {
   const [subTab, setSubTab] = useState<AdminView>(initialSubTab);
+  const hostAutoSaveTimers = React.useRef<Record<string, number>>({});
 
   React.useEffect(() => {
     setSubTab(initialSubTab);
   }, [initialSubTab]);
+
+  React.useEffect(() => {
+    const timers = hostAutoSaveTimers.current;
+    return () => {
+      Object.values(timers).forEach((timerId) => window.clearTimeout(timerId));
+    };
+  }, []);
 
   // Filters for demandes
   const [filterHost, setFilterHost] = useState<'all' | HostId>('all');
@@ -242,24 +254,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // If not signed in or not authorized admin -> show secure gate
   if (!currentUserUid || !isAdmin) {
     return (
-      <div className="max-w-xl mx-auto bg-white border border-slate-300 rounded-xl p-8 text-center space-y-6">
+      <div className="max-w-xl mx-auto bg-white border border-slate-300 rounded-2xl p-6 sm:p-8 text-center space-y-6 shadow-xs">
         <div className="w-14 h-14 mx-auto rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center">
           <Lock className="w-7 h-7" />
         </div>
 
         <div className="space-y-2">
           <h1 className="font-display text-2xl font-bold text-slate-900">
-            Espace d’Administration Sécurisé
+            Espace Organisateur Sécurisé
           </h1>
           <p className="text-sm text-slate-600 leading-relaxed">
-            Cet espace est réservé à la direction (Monsieur Jean-Jacques, Vénicia, Madame Joël) et aux administrateurs autorisés pour valider les rendez-vous et gérer les agendas Google.
+            Cet espace est réservé à l’organisateur et à la direction (Monsieur Jean-Jacques, Vénicia, Madame Joël) pour gérer les invités, valider les rendez-vous et synchroniser Google Agenda.
           </p>
         </div>
 
+        {authError && (
+          <div
+            role="alert"
+            className="bg-red-50 border border-red-300 rounded-xl p-4 text-left text-xs sm:text-sm text-red-900 space-y-2"
+          >
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-700 shrink-0 mt-0.5" />
+              <span className="leading-relaxed">{authError}</span>
+            </div>
+            {onClearAuthError && (
+              <button
+                type="button"
+                onClick={onClearAuthError}
+                className="text-xs font-semibold text-red-800 underline underline-offset-2"
+              >
+                Fermer ce message
+              </button>
+            )}
+          </div>
+        )}
+
         {currentUserUid && !isAdmin ? (
-          <div className="bg-orange-50 border border-orange-300 rounded-lg p-4 text-sm text-orange-900 space-y-3">
+          <div className="bg-orange-50 border border-orange-300 rounded-xl p-4 text-sm text-orange-900 space-y-3">
             <p className="font-medium">
-              Le compte <span className="font-mono font-semibold">{currentUserEmail}</span> n’est pas autorisé à accéder à l’administration.
+              Le compte <span className="font-mono font-semibold">{currentUserEmail}</span> n’est pas autorisé à accéder à l’espace Organisateur.
             </p>
             <button
               type="button"
@@ -272,7 +305,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         ) : (
           <div className="pt-2 flex justify-center">
             <GoogleSignInButton
-              label="Se connecter avec Google (Admin)"
+              label="Se connecter avec Google (Organisateur)"
               onClick={onAdminSignIn}
               loading={isSigningIn}
             />
@@ -281,8 +314,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       </div>
     );
   }
-
-  const hostAutoSaveTimers = React.useRef<Record<string, number>>({});
 
   const getHostName = (id: HostId) =>
     hosts.find((h) => h.hostId === id)?.name || id;

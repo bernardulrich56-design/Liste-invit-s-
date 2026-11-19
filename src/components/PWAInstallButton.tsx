@@ -10,7 +10,7 @@ import {
   Smartphone,
   X,
 } from 'lucide-react';
-import { FESTIVAL_LOGO_URL, SHARED_APP_URL } from '../data/initialData';
+import { FESTIVAL_LOGO_URL, getPublicAppUrl } from '../data/initialData';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 
 interface PWAInstallButtonProps {
@@ -66,9 +66,11 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
     setShowGuideModal(true);
   };
 
+  const publicAppUrl = getPublicAppUrl();
+
   const handleCopyAppLink = async () => {
     try {
-      await navigator.clipboard.writeText(SHARED_APP_URL);
+      await navigator.clipboard.writeText(publicAppUrl);
       setCopiedLink(true);
       window.setTimeout(() => setCopiedLink(false), 3000);
     } catch {
@@ -202,7 +204,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({
                   <input
                     type="text"
                     readOnly
-                    value={SHARED_APP_URL}
+                    value={publicAppUrl}
                     aria-label="Lien de l'application"
                     className="flex-1 text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-slate-700 select-all"
                   />

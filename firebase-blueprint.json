@@ -163,6 +163,11 @@
           "maxLength": 300,
           "description": "Public festival schedule (signing, panel, workshop at IFC)."
         },
+        "arrivalDate": {
+          "type": "string",
+          "maxLength": 20,
+          "description": "Expected arrival date (YYYY-MM-DD)."
+        },
         "updatedAt": {
           "type": "string",
           "format": "date-time"
