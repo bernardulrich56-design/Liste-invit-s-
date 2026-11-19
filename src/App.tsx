@@ -440,7 +440,7 @@ export default function App() {
 
     const syncAndSeed = async () => {
       const guestsReadQuery = isSuperAdmin
-        ? collection(db, 'guests')
+        ? query(collection(db, 'guests'), where('orderNumber', '>=', 1))
         : query(
             collection(db, 'guests'),
             where('allowedAdminEmails', 'array-contains', adminEmailLower)
@@ -599,7 +599,11 @@ export default function App() {
       .finally(() => {
         if (cancelled) return;
         const guestsQuery = isSuperAdmin
-          ? query(collection(db, 'guests'), orderBy('orderNumber', 'asc'))
+          ? query(
+              collection(db, 'guests'),
+              where('orderNumber', '>=', 1),
+              orderBy('orderNumber', 'asc')
+            )
           : query(
               collection(db, 'guests'),
               where('allowedAdminEmails', 'array-contains', adminEmailLower)
@@ -619,7 +623,10 @@ export default function App() {
       });
 
     const apptsQuery = isSuperAdmin
-      ? query(collection(db, 'appointments'), orderBy('createdAt', 'desc'))
+      ? query(
+          collection(db, 'appointments'),
+          where('trackingCode', '>=', 'RDV-')
+        )
       : query(
           collection(db, 'appointments'),
           where('allowedAdminEmails', 'array-contains', adminEmailLower)
@@ -631,16 +638,22 @@ export default function App() {
           ...(d.data() as Omit<Appointment, 'id'>),
           id: d.id,
         }));
-        if (!isSuperAdmin) {
-          items.sort((a, b) => (b.desiredDate || '').localeCompare(a.desiredDate || ''));
-        }
+        items.sort((a, b) => {
+          const aSec = (a as { createdAt?: { seconds?: number } }).createdAt?.seconds || 0;
+          const bSec = (b as { createdAt?: { seconds?: number } }).createdAt?.seconds || 0;
+          if (aSec !== bSec) return bSec - aSec;
+          return (b.desiredDate || '').localeCompare(a.desiredDate || '');
+        });
         setAppointments(items);
       },
       (error) => handleFirestoreError(error, OperationType.LIST, 'appointments')
     );
 
     const notifsQuery = isSuperAdmin
-      ? query(collection(db, 'notifications'), orderBy('createdAt', 'desc'))
+      ? query(
+          collection(db, 'notifications'),
+          where('recipientRole', '==', 'admin')
+        )
       : query(
           collection(db, 'notifications'),
           where('allowedAdminEmails', 'array-contains', adminEmailLower)
@@ -648,12 +661,16 @@ export default function App() {
     const unsubNotifs = onSnapshot(
       notifsQuery,
       (snapshot) => {
-        setNotifications(
-          snapshot.docs.map((d) => ({
-            ...(d.data() as Omit<AppNotification, 'id'>),
-            id: d.id,
-          }))
-        );
+        const items = snapshot.docs.map((d) => ({
+          ...(d.data() as Omit<AppNotification, 'id'>),
+          id: d.id,
+        }));
+        items.sort((a, b) => {
+          const aSec = (a as { createdAt?: { seconds?: number } }).createdAt?.seconds || 0;
+          const bSec = (b as { createdAt?: { seconds?: number } }).createdAt?.seconds || 0;
+          return bSec - aSec;
+        });
+        setNotifications(items);
       },
       (error) => handleFirestoreError(error, OperationType.LIST, 'notifications')
     );

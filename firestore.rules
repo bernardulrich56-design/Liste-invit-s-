@@ -32,8 +32,9 @@ service cloud.firestore {
       return isVerified() && request.auth.token.email == 'bernardulrich56@gmail.com';
     }
 
-    function isOrganizer() {
-      return isVerified();
+    function isAdmin() {
+      return isSuperAdmin()
+        || (isVerified() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
     }
 
     function isValidGuest(data) {
@@ -218,14 +219,15 @@ service cloud.firestore {
       allow get: if true;
     }
 
-    // Guests (with confidential PII): Protected for any verified Google organizer
+    // Guests (with confidential PII): Protected for verified super admin and delegated admins
     match /guests/{guestId} {
-      allow get: if isValidId(guestId) && isOrganizer();
-      allow list: if isOrganizer() && resource.data.orderNumber >= 1;
-      allow create: if isValidId(guestId) && isOrganizer() && isValidGuest(incoming())
+      allow get: if isValidId(guestId) && isAdmin();
+      allow list: if (isSuperAdmin() && resource.data.orderNumber >= 1)
+        || (isVerified() && request.auth.token.email in resource.data.allowedAdminEmails);
+      allow create: if isValidId(guestId) && isAdmin() && isValidGuest(incoming())
         && 'bernardulrich56@gmail.com' in incoming().allowedAdminEmails
         && incoming().createdAt == request.time && incoming().updatedAt == request.time;
-      allow update: if isValidId(guestId) && isOrganizer() && isValidGuest(incoming())
+      allow update: if isValidId(guestId) && isAdmin() && isValidGuest(incoming())
         && incoming().createdAt == existing().createdAt
         && incoming().updatedAt == request.time
         && 'bernardulrich56@gmail.com' in incoming().allowedAdminEmails
@@ -233,33 +235,33 @@ service cloud.firestore {
           incoming().diff(existing()).affectedKeys().hasOnly(['checkedIn', 'checkedInAt', 'updatedBy', 'updatedAt'])
           || incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'nationality', 'passportNumber', 'fullCoverage', 'coverageNote', 'photoUrl', 'notes', 'arrivalDate', 'arrivalFlight', 'hotelName', 'driverName', 'programSchedule', 'allowedAdminEmails', 'updatedBy', 'updatedAt'])
         );
-      allow delete: if isValidId(guestId) && isOrganizer();
+      allow delete: if isValidId(guestId) && isAdmin();
     }
 
-    // Shared Collaborative Guest Registry (non-PII): Open organizing for everyone, always saved on Firebase
+    // Public Guest Showcase (non-PII): Public read-only for WhatsApp/visitors, Organizer-only writes
     match /guests_public/{guestId} {
       allow get: if isValidId(guestId);
       allow list: if resource.data.orderNumber >= 1;
-      allow create: if isValidId(guestId) && isValidPublicGuest(incoming())
+      allow create: if isValidId(guestId) && isAdmin() && isValidPublicGuest(incoming())
         && incoming().updatedAt == request.time;
-      allow update: if isValidId(guestId) && isValidPublicGuest(incoming())
+      allow update: if isValidId(guestId) && isAdmin() && isValidPublicGuest(incoming())
         && incoming().orderNumber == existing().orderNumber
         && incoming().updatedAt == request.time
         && incoming().diff(existing()).affectedKeys().hasOnly([
           'fullName', 'nationality', 'fullCoverage', 'coverageNote',
           'photoUrl', 'checkedIn', 'checkedInAt', 'programSchedule', 'arrivalDate', 'updatedAt'
         ]);
-      allow delete: if isValidId(guestId);
+      allow delete: if isValidId(guestId) && isAdmin();
     }
 
-    // Hosts availability & Google Calendar config: Open organizing for everyone
+    // Hosts availability & Google Calendar config: Public read, Organizer-only writes
     match /hosts/{hostId} {
       allow get: if isValidId(hostId) && hostId in ['jean-jacques', 'venicia', 'joel'];
       allow list: if resource.data.hostId in ['jean-jacques', 'venicia', 'joel'];
-      allow create: if isValidId(hostId) && hostId in ['jean-jacques', 'venicia', 'joel']
+      allow create: if isValidId(hostId) && isAdmin() && hostId in ['jean-jacques', 'venicia', 'joel']
         && isValidHostConfig(incoming())
         && incoming().updatedAt == request.time;
-      allow update: if isValidId(hostId) && hostId in ['jean-jacques', 'venicia', 'joel']
+      allow update: if isValidId(hostId) && isAdmin() && hostId in ['jean-jacques', 'venicia', 'joel']
         && isValidHostConfig(incoming())
         && incoming().hostId == existing().hostId
         && incoming().updatedAt == request.time
@@ -270,12 +272,13 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Appointments (contains requester contact PII): Protected for verified Google organizers and requester owner
+    // Appointments (contains requester contact PII): Protected for verified admins and requester owner
     match /appointments/{appointmentId} {
       allow get: if isValidId(appointmentId) && (
-        isOrganizer() || (isVerified() && existing().requesterUid == request.auth.uid)
+        isAdmin() || (isVerified() && existing().requesterUid == request.auth.uid)
       );
-      allow list: if isOrganizer() && resource.data.trackingCode is string;
+      allow list: if (isSuperAdmin() && resource.data.trackingCode >= 'RDV-')
+        || (isVerified() && request.auth.token.email in resource.data.allowedAdminEmails);
       allow create: if isValidId(appointmentId)
         && isValidAppointment(incoming())
         && 'bernardulrich56@gmail.com' in incoming().allowedAdminEmails
@@ -288,7 +291,7 @@ service cloud.firestore {
         && incoming().createdAt == request.time
         && incoming().updatedAt == request.time
         && existsAfter(/databases/$(database)/documents/appointment_status/$(incoming().trackingCode));
-      allow update: if isValidId(appointmentId) && isOrganizer() && isValidAppointment(incoming())
+      allow update: if isValidId(appointmentId) && isAdmin() && isValidAppointment(incoming())
         && incoming().trackingCode == existing().trackingCode
         && incoming().requesterUid == existing().requesterUid
         && incoming().createdAt == existing().createdAt
@@ -297,10 +300,10 @@ service cloud.firestore {
           incoming().diff(existing()).affectedKeys().hasOnly(['status', 'proposedDate', 'proposedTime', 'adminComment', 'calendarEvents', 'allowedAdminEmails', 'reviewedBy', 'updatedAt'])
           || incoming().diff(existing()).affectedKeys().hasOnly(['desiredDate', 'desiredTime', 'durationMinutes', 'format', 'status', 'proposedDate', 'proposedTime', 'adminComment', 'calendarEvents', 'allowedAdminEmails', 'reviewedBy', 'updatedAt'])
         );
-      allow delete: if isValidId(appointmentId) && isOrganizer();
+      allow delete: if isValidId(appointmentId) && isAdmin();
     }
 
-    // Non-PII collaborative appointment status & schedule management for everyone
+    // Non-PII public appointment status & schedule lookup
     match /appointment_status/{trackingCode} {
       allow get: if isValidId(trackingCode);
       allow list: if resource.data.status in ['pending', 'confirmed', 'declined_or_reschedule'];
@@ -312,7 +315,7 @@ service cloud.firestore {
         && incoming().adminComment == ''
         && incoming().createdAt == request.time
         && incoming().updatedAt == request.time;
-      allow update: if isValidId(trackingCode) && isValidPublicStatus(incoming())
+      allow update: if isValidId(trackingCode) && isAdmin() && isValidPublicStatus(incoming())
         && incoming().trackingCode == existing().trackingCode
         && incoming().createdAt == existing().createdAt
         && incoming().updatedAt == request.time
@@ -320,24 +323,26 @@ service cloud.firestore {
           'desiredDate', 'desiredTime', 'durationMinutes', 'format',
           'status', 'proposedDate', 'proposedTime', 'adminComment', 'updatedAt'
         ]);
-      allow delete: if isValidId(trackingCode);
+      allow delete: if isValidId(trackingCode) && isAdmin();
     }
 
     // Notifications
     match /notifications/{notificationId} {
       allow get: if isValidId(notificationId) && (
-        isOrganizer() || existing().recipientRole == 'requester'
+        isAdmin() || existing().recipientRole == 'requester'
       );
       allow list: if resource.data.recipientRole == 'requester'
-        || (isOrganizer() && resource.data.recipientRole == 'admin');
+        || (isSuperAdmin() && resource.data.recipientRole == 'admin')
+        || (isVerified() && request.auth.token.email in resource.data.allowedAdminEmails);
       allow create: if isValidId(notificationId) && isValidNotification(incoming())
         && 'bernardulrich56@gmail.com' in incoming().allowedAdminEmails
         && incoming().read == false
-        && incoming().createdAt == request.time;
-      allow update: if isValidId(notificationId) && isValidNotification(incoming())
+        && incoming().createdAt == request.time
+        && (incoming().recipientRole == 'admin' || isAdmin());
+      allow update: if isValidId(notificationId) && isAdmin() && isValidNotification(incoming())
         && incoming().createdAt == existing().createdAt
         && incoming().diff(existing()).affectedKeys().hasOnly(['read']);
-      allow delete: if isValidId(notificationId) && isOrganizer();
+      allow delete: if isValidId(notificationId) && isAdmin();
     }
 
     // Admins registry (Super Admin management)
