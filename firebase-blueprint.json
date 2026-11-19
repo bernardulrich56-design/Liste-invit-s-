@@ -1,0 +1,594 @@
+{
+  "entities": {
+    "Guest": {
+      "title": "Guest",
+      "description": "An invited guest of Bilili BD Festival 2026 with attendance and identification details.",
+      "type": "object",
+      "properties": {
+        "orderNumber": {
+          "type": "number",
+          "description": "Row number from the official guest list."
+        },
+        "fullName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 160,
+          "description": "Full name and title of the guest."
+        },
+        "nationality": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "Nationality of the guest."
+        },
+        "passportNumber": {
+          "type": "string",
+          "maxLength": 40,
+          "description": "Passport number if provided."
+        },
+        "fullCoverage": {
+          "type": "boolean",
+          "description": "Whether the guest has full coverage by Bilili."
+        },
+        "coverageNote": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Additional note regarding coverage."
+        },
+        "photoUrl": {
+          "type": "string",
+          "maxLength": 350000,
+          "description": "Local asset path or compressed data URL for the guest portrait."
+        },
+        "checkedIn": {
+          "type": "boolean",
+          "description": "Whether the guest has been received."
+        },
+        "checkedInAt": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "ISO timestamp when the guest was marked as received."
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Reception notes for the guest."
+        },
+        "arrivalDate": {
+          "type": "string",
+          "maxLength": 20,
+          "description": "Expected arrival date (YYYY-MM-DD)."
+        },
+        "arrivalFlight": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "Flight number and arrival time."
+        },
+        "hotelName": {
+          "type": "string",
+          "maxLength": 160,
+          "description": "Hotel accommodation name."
+        },
+        "driverName": {
+          "type": "string",
+          "maxLength": 160,
+          "description": "Assigned shuttle or driver name/contact."
+        },
+        "programSchedule": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Public festival schedule (signing, panel, workshop at IFC)."
+        },
+        "allowedAdminEmails": {
+          "type": "array",
+          "description": "Verified administrator emails allowed to query this record."
+        },
+        "updatedBy": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "UID of the staff member who last updated the record."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "orderNumber",
+        "fullName",
+        "nationality",
+        "passportNumber",
+        "fullCoverage",
+        "coverageNote",
+        "photoUrl",
+        "checkedIn",
+        "checkedInAt",
+        "notes",
+        "allowedAdminEmails",
+        "updatedBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PublicGuest": {
+      "title": "PublicGuest",
+      "description": "Non-PII public showcase of an invited guest of Bilili BD Festival 2026 for read-only visitor consultation.",
+      "type": "object",
+      "properties": {
+        "orderNumber": {
+          "type": "number",
+          "description": "Row number from the official guest list."
+        },
+        "fullName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 160,
+          "description": "Full name and title of the guest."
+        },
+        "nationality": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80,
+          "description": "Nationality of the guest."
+        },
+        "fullCoverage": {
+          "type": "boolean",
+          "description": "Whether the guest has full coverage by Bilili."
+        },
+        "coverageNote": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Additional note regarding coverage."
+        },
+        "photoUrl": {
+          "type": "string",
+          "maxLength": 350000,
+          "description": "Local asset path or compressed data URL for the guest portrait."
+        },
+        "checkedIn": {
+          "type": "boolean",
+          "description": "Whether the guest has been received."
+        },
+        "checkedInAt": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "ISO timestamp when the guest was marked as received."
+        },
+        "programSchedule": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Public festival schedule (signing, panel, workshop at IFC)."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "orderNumber",
+        "fullName",
+        "nationality",
+        "fullCoverage",
+        "coverageNote",
+        "photoUrl",
+        "checkedIn",
+        "checkedInAt",
+        "updatedAt"
+      ]
+    },
+    "HostConfig": {
+      "title": "HostConfig",
+      "description": "Availability and Google Calendar configuration for a festival host (Jean-Jacques, Venicia, or Madame Joel).",
+      "type": "object",
+      "properties": {
+        "hostId": {
+          "type": "string",
+          "enum": ["jean-jacques", "venicia", "joel"]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "role": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "googleCalendarId": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "googleConnectedEmail": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "googleConnected": {
+          "type": "boolean"
+        },
+        "workingDays": {
+          "type": "array",
+          "description": "List of available weekday keys."
+        },
+        "startHour": {
+          "type": "string",
+          "maxLength": 10,
+          "pattern": "^[0-2][0-9]:[0-5][0-9]$"
+        },
+        "endHour": {
+          "type": "string",
+          "maxLength": 10,
+          "pattern": "^[0-2][0-9]:[0-5][0-9]$"
+        },
+        "blockedDates": {
+          "type": "array",
+          "description": "List of YYYY-MM-DD dates blocked by the host."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "hostId",
+        "name",
+        "role",
+        "email",
+        "googleCalendarId",
+        "googleConnectedEmail",
+        "googleConnected",
+        "workingDays",
+        "startHour",
+        "endHour",
+        "blockedDates",
+        "updatedAt"
+      ]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "An appointment request submitted by a user for one or more hosts.",
+      "type": "object",
+      "properties": {
+        "trackingCode": {
+          "type": "string",
+          "minLength": 6,
+          "maxLength": 24,
+          "pattern": "^RDV-[A-Z0-9\\-]+$"
+        },
+        "requesterUid": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "requesterName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "requesterPhone": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 40
+        },
+        "requesterEmail": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "hostIds": {
+          "type": "array",
+          "description": "Target host identifiers."
+        },
+        "isGroupMeeting": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "Moment d'échange",
+            "Discussion personnelle",
+            "Accompagnement",
+            "Travail spécifique",
+            "Réunion de projet",
+            "Autre"
+          ]
+        },
+        "customReason": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "desiredDate": {
+          "type": "string",
+          "maxLength": 20,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "desiredTime": {
+          "type": "string",
+          "maxLength": 10,
+          "pattern": "^[0-2][0-9]:[0-5][0-9]$"
+        },
+        "durationMinutes": {
+          "type": "number"
+        },
+        "format": {
+          "type": "string",
+          "enum": ["présentiel", "en ligne"]
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "confirmed", "declined_or_reschedule"]
+        },
+        "proposedDate": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "proposedTime": {
+          "type": "string",
+          "maxLength": 10
+        },
+        "adminComment": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "calendarEvents": {
+          "type": "array",
+          "description": "Google Calendar synced event references per host."
+        },
+        "allowedAdminEmails": {
+          "type": "array",
+          "description": "Verified administrator emails allowed to query this appointment."
+        },
+        "reviewedBy": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "trackingCode",
+        "requesterUid",
+        "requesterName",
+        "requesterPhone",
+        "requesterEmail",
+        "hostIds",
+        "isGroupMeeting",
+        "reason",
+        "customReason",
+        "desiredDate",
+        "desiredTime",
+        "durationMinutes",
+        "format",
+        "description",
+        "status",
+        "proposedDate",
+        "proposedTime",
+        "adminComment",
+        "calendarEvents",
+        "allowedAdminEmails",
+        "reviewedBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PublicAppointmentStatus": {
+      "title": "PublicAppointmentStatus",
+      "description": "Non-PII public status record keyed by tracking code for requester lookup.",
+      "type": "object",
+      "properties": {
+        "trackingCode": {
+          "type": "string",
+          "minLength": 6,
+          "maxLength": 24,
+          "pattern": "^RDV-[A-Z0-9\\-]+$"
+        },
+        "hostIds": {
+          "type": "array"
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "desiredDate": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "desiredTime": {
+          "type": "string",
+          "maxLength": 10
+        },
+        "durationMinutes": {
+          "type": "number"
+        },
+        "format": {
+          "type": "string",
+          "enum": ["présentiel", "en ligne"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "confirmed", "declined_or_reschedule"]
+        },
+        "proposedDate": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "proposedTime": {
+          "type": "string",
+          "maxLength": 10
+        },
+        "adminComment": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "trackingCode",
+        "hostIds",
+        "reason",
+        "desiredDate",
+        "desiredTime",
+        "durationMinutes",
+        "format",
+        "status",
+        "proposedDate",
+        "proposedTime",
+        "adminComment",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "Notification generated upon new appointment request or admin decision.",
+      "type": "object",
+      "properties": {
+        "recipientRole": {
+          "type": "string",
+          "enum": ["admin", "requester"]
+        },
+        "hostId": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "trackingCode": {
+          "type": "string",
+          "maxLength": 24
+        },
+        "appointmentId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "title": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 160
+        },
+        "message": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 500
+        },
+        "type": {
+          "type": "string",
+          "enum": ["new_request", "confirmed", "rescheduled", "declined", "calendar_sync"]
+        },
+        "read": {
+          "type": "boolean"
+        },
+        "allowedAdminEmails": {
+          "type": "array",
+          "description": "Verified administrator emails allowed to read admin notifications."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "recipientRole",
+        "hostId",
+        "trackingCode",
+        "appointmentId",
+        "title",
+        "message",
+        "type",
+        "read",
+        "allowedAdminEmails",
+        "createdAt"
+      ]
+    },
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Authorized administrator account mapped by UID.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "displayName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "role": {
+          "type": "string",
+          "enum": ["super_admin", "host_admin"]
+        },
+        "hostId": {
+          "type": "string",
+          "enum": ["all", "jean-jacques", "venicia", "joel"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "uid",
+        "email",
+        "displayName",
+        "role",
+        "hostId",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/guests/{guestId}": {
+      "schema": { "$ref": "#/entities/Guest" },
+      "description": "Official Bilili BD Festival 2026 guest attendance records."
+    },
+    "/guests_public/{guestId}": {
+      "schema": { "$ref": "#/entities/PublicGuest" },
+      "description": "Non-PII public guest list for read-only visitor consultation."
+    },
+    "/hosts/{hostId}": {
+      "schema": { "$ref": "#/entities/HostConfig" },
+      "description": "Availability schedule and Google Calendar configuration per host."
+    },
+    "/appointments/{appointmentId}": {
+      "schema": { "$ref": "#/entities/Appointment" },
+      "description": "Appointment requests containing requester contact PII, strictly protected for admin and owner access."
+    },
+    "/appointment_status/{trackingCode}": {
+      "schema": { "$ref": "#/entities/PublicAppointmentStatus" },
+      "description": "Non-PII status mirror enabling requesters to track their appointment validation without exposing PII."
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "Notifications for new requests and validation decisions."
+    },
+    "/admins/{adminUid}": {
+      "schema": { "$ref": "#/entities/AdminUser" },
+      "description": "Authorized admin accounts."
+    }
+  }
+}

@@ -1,0 +1,372 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: deny everything by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Reusable Primitives ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isSuperAdmin() {
+      return isVerified() && request.auth.token.email == 'bernardulrich56@gmail.com';
+    }
+
+    function isAdmin() {
+      return isSuperAdmin() || (
+        isVerified() && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidGuest(data) {
+      return data.keys().hasAll([
+        'orderNumber', 'fullName', 'nationality', 'passportNumber',
+        'fullCoverage', 'coverageNote', 'photoUrl', 'checkedIn',
+        'checkedInAt', 'notes', 'allowedAdminEmails', 'updatedBy', 'createdAt', 'updatedAt'
+      ]) && data.keys().hasOnly([
+        'orderNumber', 'fullName', 'nationality', 'passportNumber',
+        'fullCoverage', 'coverageNote', 'photoUrl', 'checkedIn',
+        'checkedInAt', 'notes', 'arrivalDate', 'arrivalFlight', 'hotelName',
+        'driverName', 'programSchedule', 'allowedAdminEmails', 'updatedBy', 'createdAt', 'updatedAt'
+      ])
+      && data.orderNumber is number && data.orderNumber >= 1 && data.orderNumber <= 9999
+      && data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 160
+      && data.nationality is string && data.nationality.size() >= 2 && data.nationality.size() <= 80
+      && data.passportNumber is string && data.passportNumber.size() <= 40
+      && data.fullCoverage is bool
+      && data.coverageNote is string && data.coverageNote.size() <= 200
+      && data.photoUrl is string && data.photoUrl.size() <= 350000
+      && data.checkedIn is bool
+      && data.checkedInAt is string && data.checkedInAt.size() <= 64
+      && data.notes is string && data.notes.size() <= 500
+      && (!('arrivalDate' in data) || (data.arrivalDate is string && data.arrivalDate.size() <= 20))
+      && (!('arrivalFlight' in data) || (data.arrivalFlight is string && data.arrivalFlight.size() <= 120))
+      && (!('hotelName' in data) || (data.hotelName is string && data.hotelName.size() <= 160))
+      && (!('driverName' in data) || (data.driverName is string && data.driverName.size() <= 160))
+      && (!('programSchedule' in data) || (data.programSchedule is string && data.programSchedule.size() <= 300))
+      && data.allowedAdminEmails is list && data.allowedAdminEmails.size() >= 1 && data.allowedAdminEmails.size() <= 10
+      && data.allowedAdminEmails[0] is string
+      && data.updatedBy is string && data.updatedBy.size() <= 128
+      && data.createdAt is timestamp
+      && data.updatedAt is timestamp;
+    }
+
+    function isValidPublicGuest(data) {
+      return data.keys().hasAll([
+        'orderNumber', 'fullName', 'nationality', 'fullCoverage',
+        'coverageNote', 'photoUrl', 'checkedIn', 'checkedInAt', 'updatedAt'
+      ]) && data.keys().hasOnly([
+        'orderNumber', 'fullName', 'nationality', 'fullCoverage',
+        'coverageNote', 'photoUrl', 'checkedIn', 'checkedInAt', 'programSchedule', 'updatedAt'
+      ])
+      && data.orderNumber is number && data.orderNumber >= 1 && data.orderNumber <= 9999
+      && data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 160
+      && data.nationality is string && data.nationality.size() >= 2 && data.nationality.size() <= 80
+      && data.fullCoverage is bool
+      && data.coverageNote is string && data.coverageNote.size() <= 200
+      && data.photoUrl is string && data.photoUrl.size() <= 350000
+      && data.checkedIn is bool
+      && data.checkedInAt is string && data.checkedInAt.size() <= 64
+      && (!('programSchedule' in data) || (data.programSchedule is string && data.programSchedule.size() <= 300))
+      && data.updatedAt is timestamp;
+    }
+
+    function isValidHostConfig(data) {
+      return data.keys().hasAll([
+        'hostId', 'name', 'role', 'email', 'googleCalendarId',
+        'googleConnectedEmail', 'googleConnected', 'workingDays',
+        'startHour', 'endHour', 'blockedDates', 'updatedAt'
+      ]) && data.keys().hasOnly([
+        'hostId', 'name', 'role', 'email', 'googleCalendarId',
+        'googleConnectedEmail', 'googleConnected', 'workingDays',
+        'startHour', 'endHour', 'blockedDates', 'updatedAt'
+      ])
+      && data.hostId in ['jean-jacques', 'venicia', 'joel']
+      && data.name is string && data.name.size() >= 2 && data.name.size() <= 100
+      && data.role is string && data.role.size() >= 2 && data.role.size() <= 120
+      && data.email is string && data.email.size() <= 120
+      && data.googleCalendarId is string && data.googleCalendarId.size() <= 160
+      && data.googleConnectedEmail is string && data.googleConnectedEmail.size() <= 120
+      && data.googleConnected is bool
+      && data.workingDays is list && data.workingDays.size() <= 7
+      && (data.workingDays.size() == 0 || data.workingDays[0] is string)
+      && data.startHour is string && data.startHour.size() <= 10 && data.startHour.matches('^[0-2][0-9]:[0-5][0-9]$')
+      && data.endHour is string && data.endHour.size() <= 10 && data.endHour.matches('^[0-2][0-9]:[0-5][0-9]$')
+      && data.blockedDates is list && data.blockedDates.size() <= 120
+      && (data.blockedDates.size() == 0 || data.blockedDates[0] is string)
+      && data.updatedAt is timestamp;
+    }
+
+    function isValidAppointment(data) {
+      return data.keys().hasAll([
+        'trackingCode', 'requesterUid', 'requesterName', 'requesterPhone',
+        'requesterEmail', 'hostIds', 'isGroupMeeting', 'reason', 'customReason',
+        'desiredDate', 'desiredTime', 'durationMinutes', 'format', 'description',
+        'status', 'proposedDate', 'proposedTime', 'adminComment',
+        'calendarEvents', 'allowedAdminEmails', 'reviewedBy', 'createdAt', 'updatedAt'
+      ]) && data.keys().hasOnly([
+        'trackingCode', 'requesterUid', 'requesterName', 'requesterPhone',
+        'requesterEmail', 'hostIds', 'isGroupMeeting', 'reason', 'customReason',
+        'desiredDate', 'desiredTime', 'durationMinutes', 'format', 'description',
+        'status', 'proposedDate', 'proposedTime', 'adminComment',
+        'calendarEvents', 'allowedAdminEmails', 'reviewedBy', 'createdAt', 'updatedAt'
+      ])
+      && data.trackingCode is string && data.trackingCode.size() >= 6 && data.trackingCode.size() <= 24 && data.trackingCode.matches('^RDV-[A-Z0-9\\-]+$')
+      && data.requesterUid is string && data.requesterUid.size() >= 1 && data.requesterUid.size() <= 128
+      && data.requesterName is string && data.requesterName.size() >= 2 && data.requesterName.size() <= 120
+      && data.requesterPhone is string && data.requesterPhone.size() >= 5 && data.requesterPhone.size() <= 40
+      && data.requesterEmail is string && data.requesterEmail.size() <= 120
+      && data.hostIds is list && data.hostIds.size() >= 1 && data.hostIds.size() <= 3 && data.hostIds[0] is string
+      && data.isGroupMeeting is bool
+      && data.reason in ["Moment d'échange", 'Discussion personnelle', 'Accompagnement', 'Travail spécifique', 'Réunion de projet', 'Autre']
+      && data.customReason is string && data.customReason.size() <= 200
+      && data.desiredDate is string && data.desiredDate.size() <= 20 && data.desiredDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+      && data.desiredTime is string && data.desiredTime.size() <= 10 && data.desiredTime.matches('^[0-2][0-9]:[0-5][0-9]$')
+      && data.durationMinutes is number && data.durationMinutes >= 15 && data.durationMinutes <= 240
+      && data.format in ['présentiel', 'en ligne']
+      && data.description is string && data.description.size() <= 2000
+      && data.status in ['pending', 'confirmed', 'declined_or_reschedule']
+      && data.proposedDate is string && data.proposedDate.size() <= 20
+      && data.proposedTime is string && data.proposedTime.size() <= 10
+      && data.adminComment is string && data.adminComment.size() <= 1000
+      && data.calendarEvents is list && data.calendarEvents.size() <= 6
+      && data.allowedAdminEmails is list && data.allowedAdminEmails.size() >= 1 && data.allowedAdminEmails.size() <= 10
+      && data.allowedAdminEmails[0] is string
+      && data.reviewedBy is string && data.reviewedBy.size() <= 128
+      && data.createdAt is timestamp
+      && data.updatedAt is timestamp;
+    }
+
+    function isValidPublicStatus(data) {
+      return data.keys().hasAll([
+        'trackingCode', 'hostIds', 'reason', 'desiredDate', 'desiredTime',
+        'durationMinutes', 'format', 'status', 'proposedDate', 'proposedTime',
+        'adminComment', 'createdAt', 'updatedAt'
+      ]) && data.keys().hasOnly([
+        'trackingCode', 'hostIds', 'reason', 'desiredDate', 'desiredTime',
+        'durationMinutes', 'format', 'status', 'proposedDate', 'proposedTime',
+        'adminComment', 'createdAt', 'updatedAt'
+      ])
+      && data.trackingCode is string && data.trackingCode.size() >= 6 && data.trackingCode.size() <= 24 && data.trackingCode.matches('^RDV-[A-Z0-9\\-]+$')
+      && data.hostIds is list && data.hostIds.size() >= 1 && data.hostIds.size() <= 3 && data.hostIds[0] is string
+      && data.reason is string && data.reason.size() >= 2 && data.reason.size() <= 80
+      && data.desiredDate is string && data.desiredDate.size() <= 20
+      && data.desiredTime is string && data.desiredTime.size() <= 10
+      && data.durationMinutes is number && data.durationMinutes >= 15 && data.durationMinutes <= 240
+      && data.format in ['présentiel', 'en ligne']
+      && data.status in ['pending', 'confirmed', 'declined_or_reschedule']
+      && data.proposedDate is string && data.proposedDate.size() <= 20
+      && data.proposedTime is string && data.proposedTime.size() <= 10
+      && data.adminComment is string && data.adminComment.size() <= 1000
+      && data.createdAt is timestamp
+      && data.updatedAt is timestamp;
+    }
+
+    function isValidNotification(data) {
+      return data.keys().hasAll([
+        'recipientRole', 'hostId', 'trackingCode', 'appointmentId',
+        'title', 'message', 'type', 'read', 'allowedAdminEmails', 'createdAt'
+      ]) && data.keys().hasOnly([
+        'recipientRole', 'hostId', 'trackingCode', 'appointmentId',
+        'title', 'message', 'type', 'read', 'allowedAdminEmails', 'createdAt'
+      ])
+      && data.recipientRole in ['admin', 'requester']
+      && data.hostId is string && data.hostId.size() >= 1 && data.hostId.size() <= 40
+      && data.trackingCode is string && data.trackingCode.size() >= 6 && data.trackingCode.size() <= 24
+      && data.appointmentId is string && data.appointmentId.size() >= 1 && data.appointmentId.size() <= 128
+      && data.title is string && data.title.size() >= 2 && data.title.size() <= 160
+      && data.message is string && data.message.size() >= 2 && data.message.size() <= 500
+      && data.type in ['new_request', 'confirmed', 'rescheduled', 'declined', 'calendar_sync']
+      && data.read is bool
+      && data.allowedAdminEmails is list && data.allowedAdminEmails.size() >= 1 && data.allowedAdminEmails.size() <= 10
+      && data.allowedAdminEmails[0] is string
+      && data.createdAt is timestamp;
+    }
+
+    function isValidAdminUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'hostId', 'createdAt'])
+      && data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'hostId', 'createdAt'])
+      && data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128
+      && data.email is string && data.email.size() >= 3 && data.email.size() <= 120
+      && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120
+      && data.role in ['super_admin', 'host_admin']
+      && data.hostId in ['all', 'jean-jacques', 'venicia', 'joel']
+      && data.createdAt is timestamp;
+    }
+
+    // Connection healthcheck doc
+    match /test/connection {
+      allow get: if true;
+    }
+
+    // Guests: Protected for verified administrators
+    match /guests/{guestId} {
+      allow get: if isValidId(guestId) && isAdmin();
+      allow list: if isVerified() && (
+        request.auth.token.email == 'bernardulrich56@gmail.com'
+        || request.auth.token.email in resource.data.allowedAdminEmails
+      );
+      allow create: if isValidId(guestId) && isAdmin() && isValidGuest(incoming())
+        && 'bernardulrich56@gmail.com' in incoming().allowedAdminEmails
+        && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if isValidId(guestId) && isAdmin() && isValidGuest(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && 'bernardulrich56@gmail.com' in incoming().allowedAdminEmails
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['checkedIn', 'checkedInAt', 'updatedBy', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'nationality', 'passportNumber', 'fullCoverage', 'coverageNote', 'photoUrl', 'notes', 'arrivalDate', 'arrivalFlight', 'hotelName', 'driverName', 'programSchedule', 'allowedAdminEmails', 'updatedBy', 'updatedAt'])
+        );
+      allow delete: if isValidId(guestId) && isAdmin();
+    }
+
+    // Public Guest Showcase: Read-only non-PII list for visitors, writable only by verified administrators
+    match /guests_public/{guestId} {
+      allow get: if isValidId(guestId);
+      allow list: if isSuperAdmin() || resource.data.orderNumber >= 1;
+      allow create: if isValidId(guestId) && isAdmin() && isValidPublicGuest(incoming())
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(guestId) && isAdmin() && isValidPublicGuest(incoming())
+        && incoming().orderNumber == existing().orderNumber
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'fullName', 'nationality', 'fullCoverage', 'coverageNote',
+          'photoUrl', 'checkedIn', 'checkedInAt', 'programSchedule', 'updatedAt'
+        ]);
+      allow delete: if isValidId(guestId) && isAdmin();
+    }
+
+    // Hosts availability & Google Calendar config
+    match /hosts/{hostId} {
+      allow get: if isValidId(hostId) && hostId in ['jean-jacques', 'venicia', 'joel'];
+      allow list: if isSuperAdmin() || resource.data.hostId in ['jean-jacques', 'venicia', 'joel'];
+      allow create: if isValidId(hostId) && hostId in ['jean-jacques', 'venicia', 'joel']
+        && isAdmin() && isValidHostConfig(incoming())
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(hostId) && hostId in ['jean-jacques', 'venicia', 'joel']
+        && isAdmin() && isValidHostConfig(incoming())
+        && incoming().hostId == existing().hostId
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'name', 'role', 'email', 'googleCalendarId', 'googleConnectedEmail',
+          'googleConnected', 'workingDays', 'startHour', 'endHour', 'blockedDates', 'updatedAt'
+        ]);
+      allow delete: if false;
+    }
+
+    // Appointments (contains requester PII)
+    match /appointments/{appointmentId} {
+      allow get: if isValidId(appointmentId) && (
+        isAdmin() || (isVerified() && existing().requesterUid == request.auth.uid)
+      );
+      allow list: if isVerified() && (
+        request.auth.token.email == 'bernardulrich56@gmail.com'
+        || request.auth.token.email in resource.data.allowedAdminEmails
+        || resource.data.requesterUid == request.auth.uid
+      );
+      allow create: if isValidId(appointmentId)
+        && isValidAppointment(incoming())
+        && 'bernardulrich56@gmail.com' in incoming().allowedAdminEmails
+        && incoming().status == 'pending'
+        && incoming().proposedDate == ''
+        && incoming().proposedTime == ''
+        && incoming().adminComment == ''
+        && incoming().reviewedBy == ''
+        && incoming().calendarEvents.size() == 0
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && existsAfter(/databases/$(database)/documents/appointment_status/$(incoming().trackingCode));
+      allow update: if isValidId(appointmentId) && isAdmin() && isValidAppointment(incoming())
+        && incoming().trackingCode == existing().trackingCode
+        && incoming().requesterUid == existing().requesterUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'proposedDate', 'proposedTime', 'adminComment', 'calendarEvents', 'allowedAdminEmails', 'reviewedBy', 'updatedAt'])
+          || incoming().diff(existing()).affectedKeys().hasOnly(['desiredDate', 'desiredTime', 'durationMinutes', 'format', 'status', 'proposedDate', 'proposedTime', 'adminComment', 'calendarEvents', 'allowedAdminEmails', 'reviewedBy', 'updatedAt'])
+        );
+      allow delete: if isValidId(appointmentId) && isAdmin();
+    }
+
+    // Non-PII public appointment status lookup by tracking code
+    match /appointment_status/{trackingCode} {
+      allow get: if isValidId(trackingCode);
+      allow list: if resource.data.status == 'confirmed';
+      allow create: if isValidId(trackingCode) && isValidPublicStatus(incoming())
+        && incoming().trackingCode == trackingCode
+        && incoming().status == 'pending'
+        && incoming().proposedDate == ''
+        && incoming().proposedTime == ''
+        && incoming().adminComment == ''
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(trackingCode) && isAdmin() && isValidPublicStatus(incoming())
+        && incoming().trackingCode == existing().trackingCode
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'desiredDate', 'desiredTime', 'durationMinutes', 'format',
+          'status', 'proposedDate', 'proposedTime', 'adminComment', 'updatedAt'
+        ]);
+      allow delete: if isValidId(trackingCode) && isAdmin();
+    }
+
+    // Notifications
+    match /notifications/{notificationId} {
+      allow get: if isValidId(notificationId) && (
+        isAdmin() || existing().recipientRole == 'requester'
+      );
+      allow list: if resource.data.recipientRole == 'requester'
+        || (isVerified() && (
+          request.auth.token.email == 'bernardulrich56@gmail.com'
+          || request.auth.token.email in resource.data.allowedAdminEmails
+        ));
+      allow create: if isValidId(notificationId) && isValidNotification(incoming())
+        && 'bernardulrich56@gmail.com' in incoming().allowedAdminEmails
+        && incoming().read == false
+        && incoming().createdAt == request.time
+        && (
+          (incoming().recipientRole == 'admin' && incoming().type == 'new_request')
+          || isAdmin()
+        );
+      allow update: if isValidId(notificationId) && isAdmin() && isValidNotification(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+      allow delete: if isValidId(notificationId) && isAdmin();
+    }
+
+    // Admins registry
+    match /admins/{adminUid} {
+      allow get: if isValidId(adminUid) && (isAdmin() || (isVerified() && request.auth.uid == adminUid));
+      allow list: if isVerified() && request.auth.token.email == 'bernardulrich56@gmail.com';
+      allow create: if isValidId(adminUid) && isSuperAdmin() && isValidAdminUser(incoming())
+        && incoming().uid == adminUid
+        && incoming().createdAt == request.time;
+      allow update: if isValidId(adminUid) && isSuperAdmin() && isValidAdminUser(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'displayName', 'role', 'hostId']);
+      allow delete: if isValidId(adminUid) && isSuperAdmin();
+    }
+  }
+}
