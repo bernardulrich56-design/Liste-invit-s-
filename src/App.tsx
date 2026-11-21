@@ -25,7 +25,6 @@ import {
 import { GuestRegistry } from './components/GuestRegistry';
 import { Navbar } from './components/Navbar';
 import { OfflineIndicator } from './components/OfflineIndicator';
-import { OrganizerGateModal } from './components/OrganizerGateModal';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { TrackingSection } from './components/TrackingSection';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
@@ -192,13 +191,6 @@ export default function App() {
 
   // Tracking, cross-links & auto-save state
   const isOnline = useOnlineStatus();
-  const [readOnlyAcknowledged, setReadOnlyAcknowledged] = useState<boolean>(() => {
-    try {
-      return window.sessionStorage.getItem('bilili_readonly_acknowledged') === '1';
-    } catch {
-      return false;
-    }
-  });
   const [activeTrackingCode, setActiveTrackingCode] = useState('');
   const [prefillRequesterName, setPrefillRequesterName] = useState('');
   const [adminSubTab, setAdminSubTab] = useState<
@@ -252,15 +244,6 @@ export default function App() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch {
       // ignore scroll errors
-    }
-  }, []);
-
-  const handleContinueReadOnly = useCallback(() => {
-    setReadOnlyAcknowledged(true);
-    try {
-      window.sessionStorage.setItem('bilili_readonly_acknowledged', '1');
-    } catch {
-      // ignore storage errors
     }
   }, []);
 
@@ -379,72 +362,19 @@ export default function App() {
     };
   }, []);
 
-  // Read-only public guest list listener for unauthenticated / WhatsApp visitors
+  // Unified collaborative listeners + Firestore seeding & syncing for everyone
   useEffect(() => {
-    if (!isAuthReady || isAdmin) return;
-
-    const publicGuestsQuery = query(
-      collection(db, 'guests_public'),
-      where('orderNumber', '>=', 1)
-    );
-    const unsubPublicGuests = onSnapshot(
-      publicGuestsQuery,
-      (snapshot) => {
-        if (snapshot.empty) {
-          setGuests(PUBLIC_INITIAL_GUESTS);
-          return;
-        }
-        const items: Guest[] = snapshot.docs.map((d) => {
-          const data = d.data() as Omit<
-            Guest,
-            'id' | 'passportNumber' | 'notes' | 'allowedAdminEmails' | 'updatedBy'
-          >;
-          return {
-            id: d.id,
-            orderNumber: data.orderNumber,
-            fullName: data.fullName,
-            nationality: data.nationality,
-            passportNumber: '',
-            fullCoverage: Boolean(data.fullCoverage),
-            coverageNote: data.coverageNote || '',
-            photoUrl: data.photoUrl || '',
-            checkedIn: Boolean(data.checkedIn),
-            checkedInAt: data.checkedInAt || '',
-            programSchedule: data.programSchedule || '',
-            notes: '',
-            allowedAdminEmails: [],
-            updatedBy: 'public',
-          };
-        });
-        items.sort((a, b) => a.orderNumber - b.orderNumber);
-        setGuests(items);
-      },
-      (error) => {
-        console.warn('Public guests listener warning:', error.message);
-      }
-    );
-
-    return () => unsubPublicGuests();
-  }, [isAuthReady, isAdmin]);
-
-  // Admin listeners + Firestore seeding & syncing of /guests + /guests_public
-  useEffect(() => {
-    if (!isAuthReady || !isAdmin || !user) {
-      setAppointments([]);
-      setNotifications([]);
-      setAdminUsers([]);
+    if (!isAuthReady) {
       return;
     }
 
-    const adminEmailLower = (user.email || '').toLowerCase();
+    const actorUid = user?.uid || 'collaborateur';
 
     const syncAndSeed = async () => {
-      const guestsReadQuery = isSuperAdmin
-        ? query(collection(db, 'guests'), where('orderNumber', '>=', 1))
-        : query(
-            collection(db, 'guests'),
-            where('allowedAdminEmails', 'array-contains', adminEmailLower)
-          );
+      const guestsReadQuery = query(
+        collection(db, 'guests'),
+        where('orderNumber', '>=', 1)
+      );
       const guestsPublicReadQuery = query(
         collection(db, 'guests_public'),
         where('orderNumber', '>=', 1)
@@ -474,7 +404,7 @@ export default function App() {
             INITIAL_GUESTS.map((g) => ({
               ...g,
               allowedAdminEmails: [SUPER_ADMIN_EMAIL],
-              updatedBy: user.uid,
+              updatedBy: actorUid,
             }));
           const batch = writeBatch(db);
           for (const g of seedSource) {
@@ -490,7 +420,7 @@ export default function App() {
               checkedInAt: g.checkedInAt,
               notes: g.notes,
               allowedAdminEmails: [SUPER_ADMIN_EMAIL],
-              updatedBy: user.uid,
+              updatedBy: actorUid,
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
             });
@@ -522,7 +452,7 @@ export default function App() {
                 checkedIn: g.checkedIn,
                 checkedInAt: g.checkedInAt,
                 allowedAdminEmails: [SUPER_ADMIN_EMAIL],
-                updatedBy: user.uid,
+                updatedBy: actorUid,
                 updatedAt: serverTimestamp(),
               });
             } else {
@@ -538,7 +468,7 @@ export default function App() {
                 checkedInAt: g.checkedInAt,
                 notes: g.notes,
                 allowedAdminEmails: [SUPER_ADMIN_EMAIL],
-                updatedBy: user.uid,
+                updatedBy: actorUid,
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
               });
@@ -550,7 +480,6 @@ export default function App() {
           window.localStorage.removeItem(LEGACY_GUESTS_STORAGE_KEY);
           setLastSavedMessage('Modifications enregistrées et synchronisées dans la base de données.');
         } else if (guestsPublicSnap.empty) {
-          // Ensure public showcase mirrors existing guests in Firestore
           const batch = writeBatch(db);
           for (const existingDoc of guestsSnap.docs) {
             const g = existingDoc.data() as Omit<Guest, 'id'>;
@@ -598,16 +527,11 @@ export default function App() {
       })
       .finally(() => {
         if (cancelled) return;
-        const guestsQuery = isSuperAdmin
-          ? query(
-              collection(db, 'guests'),
-              where('orderNumber', '>=', 1),
-              orderBy('orderNumber', 'asc')
-            )
-          : query(
-              collection(db, 'guests'),
-              where('allowedAdminEmails', 'array-contains', adminEmailLower)
-            );
+        const guestsQuery = query(
+          collection(db, 'guests'),
+          where('orderNumber', '>=', 1),
+          orderBy('orderNumber', 'asc')
+        );
         unsubGuests = onSnapshot(
           guestsQuery,
           (snapshot) => {
@@ -622,15 +546,10 @@ export default function App() {
         );
       });
 
-    const apptsQuery = isSuperAdmin
-      ? query(
-          collection(db, 'appointments'),
-          where('trackingCode', '>=', 'RDV-')
-        )
-      : query(
-          collection(db, 'appointments'),
-          where('allowedAdminEmails', 'array-contains', adminEmailLower)
-        );
+    const apptsQuery = query(
+      collection(db, 'appointments'),
+      where('trackingCode', '>=', 'RDV-')
+    );
     const unsubAppts = onSnapshot(
       apptsQuery,
       (snapshot) => {
@@ -649,15 +568,10 @@ export default function App() {
       (error) => handleFirestoreError(error, OperationType.LIST, 'appointments')
     );
 
-    const notifsQuery = isSuperAdmin
-      ? query(
-          collection(db, 'notifications'),
-          where('recipientRole', '==', 'admin')
-        )
-      : query(
-          collection(db, 'notifications'),
-          where('allowedAdminEmails', 'array-contains', adminEmailLower)
-        );
+    const notifsQuery = query(
+      collection(db, 'notifications'),
+      where('recipientRole', '==', 'admin')
+    );
     const unsubNotifs = onSnapshot(
       notifsQuery,
       (snapshot) => {
@@ -686,6 +600,8 @@ export default function App() {
         },
         (error) => handleFirestoreError(error, OperationType.LIST, 'admins')
       );
+    } else {
+      setAdminUsers([]);
     }
 
     return () => {
@@ -695,7 +611,7 @@ export default function App() {
       unsubNotifs();
       if (unsubAdmins) unsubAdmins();
     };
-  }, [isAuthReady, isAdmin, isSuperAdmin, user]);
+  }, [isAuthReady, isSuperAdmin, user]);
 
   const startAdminSignIn = useCallback(async (openOrganizerAfter = false) => {
     setAuthError(null);
@@ -740,12 +656,9 @@ export default function App() {
     return Array.from(emails).slice(0, 10);
   }, [hosts, adminUsers]);
 
-  // Guest check-in toggle (Organizer only)
+  // Guest check-in toggle (open to everyone)
   const handleToggleGuestCheckIn = async (guest: Guest) => {
-    if (!isAdmin || !user) {
-      throw new Error("Action réservée à l'organisateur connecté.");
-    }
-
+    const actorUid = user?.uid || 'collaborateur';
     const nextChecked = !guest.checkedIn;
     const nextTime = nextChecked ? new Date().toISOString() : '';
 
@@ -757,7 +670,7 @@ export default function App() {
           batch.update(doc(db, 'guests', guest.id), {
             checkedIn: nextChecked,
             checkedInAt: nextTime,
-            updatedBy: user.uid,
+            updatedBy: actorUid,
             updatedAt: serverTimestamp(),
           });
           batch.set(
@@ -779,7 +692,7 @@ export default function App() {
     );
   };
 
-  // Guest details / photo update (Organizer only)
+  // Guest details / photo update (open to everyone)
   const handleUpdateGuest = async (
     guestId: string,
     updates: Partial<
@@ -800,10 +713,7 @@ export default function App() {
       >
     >
   ) => {
-    if (!isAdmin || !user) {
-      throw new Error("Action réservée à l'organisateur connecté.");
-    }
-
+    const actorUid = user?.uid || 'collaborateur';
     const currentGuest = guests.find((g) => g.id === guestId);
     if (!currentGuest) {
       throw new Error('Invité introuvable.');
@@ -818,7 +728,7 @@ export default function App() {
           batch.update(doc(db, 'guests', guestId), {
             ...updates,
             allowedAdminEmails: allowedEmailsList,
-            updatedBy: user.uid,
+            updatedBy: actorUid,
             updatedAt: serverTimestamp(),
           });
           batch.set(doc(db, 'guests_public', guestId), toPublicGuestPayload(merged));
@@ -833,14 +743,11 @@ export default function App() {
     );
   };
 
-  // Add new guest (Organizer only)
+  // Add new guest (open to everyone)
   const handleAddGuest = async (
     newGuest: Omit<Guest, 'id' | 'orderNumber' | 'allowedAdminEmails' | 'updatedBy'>
   ) => {
-    if (!isAdmin || !user) {
-      throw new Error("Action réservée à l'organisateur connecté.");
-    }
-
+    const actorUid = user?.uid || 'collaborateur';
     const nextOrder =
       guests.reduce((max, g) => Math.max(max, g.orderNumber), 0) + 1;
     const newId = `guest-${String(nextOrder).padStart(2, '0')}-${Date.now().toString(36)}`;
@@ -867,7 +774,7 @@ export default function App() {
             driverName: (newGuest.driverName || '').slice(0, 160),
             programSchedule: (newGuest.programSchedule || '').slice(0, 300),
             allowedAdminEmails: allowedEmailsList,
-            updatedBy: user.uid,
+            updatedBy: actorUid,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           });
@@ -894,12 +801,9 @@ export default function App() {
     );
   };
 
-  // Batch import guests from CSV / Excel (Organizer only)
+  // Batch import guests from CSV / Excel (open to everyone)
   const handleImportGuests = async (rows: ImportedGuestRow[]): Promise<number> => {
-    if (!isAdmin || !user) {
-      throw new Error("Action réservée à l'organisateur connecté.");
-    }
-
+    const actorUid = user?.uid || 'collaborateur';
     let nextOrder =
       guests.reduce((max, g) => Math.max(max, g.orderNumber), 0) + 1;
     const importedCount = rows.length;
@@ -928,7 +832,7 @@ export default function App() {
               driverName: (row.driverName || '').slice(0, 160),
               programSchedule: (row.programSchedule || '').slice(0, 300),
               allowedAdminEmails: allowedEmailsList,
-              updatedBy: user.uid,
+              updatedBy: actorUid,
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
             });
@@ -960,12 +864,8 @@ export default function App() {
     return importedCount;
   };
 
-  // Delete guest (Organizer only)
+  // Delete guest (open to everyone)
   const handleDeleteGuest = async (guest: Guest) => {
-    if (!isAdmin || !user) {
-      throw new Error("Action réservée à l'organisateur connecté.");
-    }
-
     await trackAutoSave(
       `${guest.fullName} supprimé de la liste.`,
       async () => {
@@ -1261,7 +1161,7 @@ export default function App() {
           <PWAInstallButton variant="banner" />
 
           <ConnectedEcosystemBar
-            isAdmin={isAdmin}
+            isAdmin={true}
             isSigningIn={isSigningIn}
             authError={authError}
             onClearAuthError={() => setAuthError(null)}
@@ -1314,7 +1214,7 @@ export default function App() {
                 <GuestRegistry
                   guests={guests}
                   appointments={appointments}
-                  isAdmin={isAdmin}
+                  isAdmin={true}
                   isAuthReady={isAuthReady}
                   isSigningIn={isSigningIn}
                   onAdminSignIn={handleAdminSignIn}
@@ -1358,7 +1258,7 @@ export default function App() {
                 <AdminDashboard
                   currentUserEmail={user?.email || null}
                   currentUserUid={user?.uid || null}
-                  isAdmin={isAdmin}
+                  isAdmin={true}
                   isSuperAdmin={isSuperAdmin}
                   isSigningIn={isSigningIn}
                   authError={authError}
@@ -1416,17 +1316,6 @@ export default function App() {
             </div>
           </div>
         </footer>
-
-        <OrganizerGateModal
-          open={isAuthReady && !isAdmin && !readOnlyAcknowledged && activeTab !== 'admin'}
-          currentUserEmail={user?.email || null}
-          isSigningIn={isSigningIn}
-          authError={authError}
-          onClearAuthError={() => setAuthError(null)}
-          onConfirmOrganizerGoogle={handleAdminSignIn}
-          onContinueReadOnly={handleContinueReadOnly}
-          onSwitchAccount={handleSignOut}
-        />
 
         <OfflineIndicator />
       </div>

@@ -2100,7 +2100,7 @@ export const GuestRegistry: React.FC<GuestRegistryProps> = ({
                   Partager l’application sur WhatsApp
                 </h3>
                 <p className="text-xs text-slate-600 mt-0.5">
-                  Envoyez ce lien à vos contacts WhatsApp. Seul l’organisateur connecté peut modifier les données internes.
+                  Envoyez ce lien à vos contacts WhatsApp pour consulter, ajouter ou mettre à jour les informations en temps réel.
                 </p>
               </div>
               <button
@@ -2184,7 +2184,7 @@ export const GuestRegistry: React.FC<GuestRegistryProps> = ({
             </div>
 
             <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-900 leading-relaxed">
-              Protection active : vos contacts WhatsApp peuvent consulter la liste publique (sans numéros de passeport) et soumettre une demande de rendez-vous sauvegardée automatiquement. Seul votre compte Google organisateur peut modifier ou supprimer des données.
+              Collaboration ouverte active : vos contacts WhatsApp peuvent consulter le registre, ajouter ou mettre à jour les fiches invités, et gérer les rendez-vous. Chaque modification est enregistrée automatiquement sur Firebase.
             </div>
 
             <div className="pt-2 border-t border-slate-200 flex flex-wrap items-center justify-end gap-2.5">

@@ -251,70 +251,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return lines.join('\n');
   }, [appointments, guests, hosts, appointmentStats.pending]);
 
-  // If not signed in or not authorized admin -> show secure gate
-  if (!currentUserUid || !isAdmin) {
-    return (
-      <div className="max-w-xl mx-auto bg-white border border-slate-300 rounded-2xl p-6 sm:p-8 text-center space-y-6 shadow-xs">
-        <div className="w-14 h-14 mx-auto rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center">
-          <Lock className="w-7 h-7" />
-        </div>
-
-        <div className="space-y-2">
-          <h1 className="font-display text-2xl font-bold text-slate-900">
-            Espace Organisateur Sécurisé
-          </h1>
-          <p className="text-sm text-slate-600 leading-relaxed">
-            Cet espace est réservé à l’organisateur et à la direction (Monsieur Jean-Jacques, Vénicia, Madame Joël) pour gérer les invités, valider les rendez-vous et synchroniser Google Agenda.
-          </p>
-        </div>
-
-        {authError && (
-          <div
-            role="alert"
-            className="bg-red-50 border border-red-300 rounded-xl p-4 text-left text-xs sm:text-sm text-red-900 space-y-2"
-          >
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-red-700 shrink-0 mt-0.5" />
-              <span className="leading-relaxed">{authError}</span>
-            </div>
-            {onClearAuthError && (
-              <button
-                type="button"
-                onClick={onClearAuthError}
-                className="text-xs font-semibold text-red-800 underline underline-offset-2"
-              >
-                Fermer ce message
-              </button>
-            )}
-          </div>
-        )}
-
-        {currentUserUid && !isAdmin ? (
-          <div className="bg-orange-50 border border-orange-300 rounded-xl p-4 text-sm text-orange-900 space-y-3">
-            <p className="font-medium">
-              Le compte <span className="font-mono font-semibold">{currentUserEmail}</span> n’est pas autorisé à accéder à l’espace Organisateur.
-            </p>
-            <button
-              type="button"
-              onClick={onSignOut}
-              className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800"
-            >
-              Changer de compte Google
-            </button>
-          </div>
-        ) : (
-          <div className="pt-2 flex justify-center">
-            <GoogleSignInButton
-              label="Se connecter avec Google (Organisateur)"
-              onClick={onAdminSignIn}
-              loading={isSigningIn}
-            />
-          </div>
-        )}
-      </div>
-    );
-  }
-
+  // Open collaborative organizer mode: no sign-in lock blocks access to the dashboard
   const getHostName = (id: HostId) =>
     hosts.find((h) => h.hostId === id)?.name || id;
 
@@ -815,22 +752,54 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
             <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
-              Secrétariat &amp; Validation · Connecté en tant que {currentUserEmail}
+              {currentUserEmail
+                ? `Espace Organisateur ouvert · Connecté (${currentUserEmail})`
+                : 'Espace Organisateur ouvert · Accès collaboratif pour tous'}
             </p>
             <h1 className="font-display text-2xl sm:text-3xl font-bold text-slate-900">
-              Tableau de bord d’administration des rendez-vous
+              Tableau de bord d’organisation &amp; rendez-vous
             </h1>
           </div>
 
-          <button
-            type="button"
-            onClick={onSignOut}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100 self-start md:self-auto whitespace-nowrap"
-          >
-            <LogOut className="w-4 h-4" />
-            Déconnexion
-          </button>
+          {currentUserUid ? (
+            <button
+              type="button"
+              onClick={onSignOut}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-100 self-start md:self-auto whitespace-nowrap"
+            >
+              <LogOut className="w-4 h-4" />
+              Déconnexion Google
+            </button>
+          ) : (
+            <GoogleSignInButton
+              label="Connecter Google Agenda (optionnel)"
+              onClick={onAdminSignIn}
+              loading={isSigningIn}
+              className="self-start md:self-auto"
+            />
+          )}
         </div>
+
+        {authError && (
+          <div
+            role="alert"
+            className="bg-red-50 border border-red-300 rounded-xl p-3.5 text-xs sm:text-sm text-red-900 flex items-start justify-between gap-3"
+          >
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-700 shrink-0 mt-0.5" />
+              <span>{authError}</span>
+            </div>
+            {onClearAuthError && (
+              <button
+                type="button"
+                onClick={onClearAuthError}
+                className="text-xs font-semibold text-red-800 underline shrink-0"
+              >
+                Fermer
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Summary KPI Strip */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-slate-200">
